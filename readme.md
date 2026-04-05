@@ -7,6 +7,7 @@ for when [tinyopds](https://github.com/sensboston/tinyopds) is just too much
 ## features
 
 - standards compliant OPDS feed of epubs in a folder
+- substring search
 - cover extraction
 - basic auth
 - all in a lightweight docker image
