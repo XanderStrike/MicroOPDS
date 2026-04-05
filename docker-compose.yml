@@ -1,0 +1,10 @@
+services:
+  miniopds:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./books:/books:ro
+    # environment:
+    #   USER: admin
+    #   PASS: hunter2

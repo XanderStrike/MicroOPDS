@@ -174,6 +174,9 @@ func main() {
 	port := flag.Int("port", 8080, "port to listen on")
 	flag.Parse()
 
+	user := os.Getenv("USER")
+	pass := os.Getenv("PASS")
+
 	absDir, err := filepath.Abs(*dir)
 	if err != nil {
 		log.Fatalf("invalid directory: %v", err)
@@ -189,7 +192,7 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", *port)
 	log.Printf("serving OPDS catalog at http://localhost%s/", addr)
-	if err := serve(addr, absDir, catalog); err != nil {
+	if err := serve(addr, absDir, catalog, user, pass); err != nil {
 		log.Fatal(err)
 	}
 }

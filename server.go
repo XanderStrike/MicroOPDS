@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func serve(addr, baseDir string, catalog *Catalog) error {
+func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 	mux := http.NewServeMux()
 
 	// OPDS catalog endpoint
@@ -132,15 +132,32 @@ func serve(addr, baseDir string, catalog *Catalog) error {
 		http.NotFound(w, r)
 	})
 
+	handler := http.Handler(mux)
+	if user != "" && pass != "" {
+		handler = basicAuth(mux, user, pass)
+	}
+
 	srv := &http.Server{
 		Addr:         addr,
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
 	return srv.ListenAndServe()
+}
+
+func basicAuth(next http.Handler, user, pass string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, p, ok := r.BasicAuth()
+		if !ok || u != user || p != pass {
+			w.Header().Set("WWW-Authenticate", `Basic realm="MiniOPDS"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func getBaseURL(r *http.Request) string {

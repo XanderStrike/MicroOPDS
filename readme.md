@@ -5,15 +5,11 @@ a minimal opds 1.2 catalog server for epub files.
 ## usage
 
 ```
-miniopds -dir /path/to/epubs -port 8080
+docker compose up -d
 ```
 
-opens a catalog at `http://localhost:8080/catalog`
+mounts `./books` and serves at `http://localhost:8080/catalog`
 
-## opds 1.2 compliance
+### basic auth
 
-- serves a single acquisition feed as the catalog root
-- includes atom + dublin core metadata from epub files
-- provides download links with proper content types
-- cover image support: `http://opds-spec.org/image` and `http://opds-spec.org/image/thumbnail` links
-- supports parallel scanning for fast startup
+uncomment `USER` and `PASS` in docker-compose.yml to enable basic auth.
