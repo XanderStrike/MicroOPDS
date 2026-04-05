@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,11 +27,46 @@ type Book struct {
 	Date        string
 	ModTime     time.Time
 	Size        int64
+	CoverPath   string // path to cover image within epub
+	CoverType   string // mime type of cover image
 }
 
 type Catalog struct {
 	Books []Book
 	mu    sync.RWMutex
+}
+
+// findCover locates the cover image in an EPUB package
+func findCover(opf *epub.PackageDocument) (path string, mediaType string) {
+	if opf.Manifest == nil {
+		return
+	}
+
+	// EPUB 3: look for item with properties="cover-image"
+	for _, item := range opf.Manifest.Items {
+		if strings.Contains(item.Properties, "cover-image") {
+			return item.Href, item.MediaType
+		}
+	}
+
+	// EPUB 2: look for <meta name="cover" content="item-id"/>
+	var coverID string
+	for _, meta := range opf.Metadata.Meta {
+		if meta.Name == "cover" {
+			coverID = meta.Content
+			break
+		}
+	}
+
+	if coverID != "" {
+		for _, item := range opf.Manifest.Items {
+			if item.ID == coverID {
+				return item.Href, item.MediaType
+			}
+		}
+	}
+
+	return
 }
 
 func scan(dir string) (*Catalog, error) {
@@ -60,9 +96,23 @@ func scan(dir string) (*Catalog, error) {
 			sem <- struct{}{}
 			defer func() { <-sem; wg.Done() }()
 
-			metadata, err := epub.GetMetadataFromFile(path)
+			// Open epub to get both metadata and package for cover
+			e, err := epub.Open(path)
 			if err != nil {
 				log.Printf("error reading %s: %v", path, err)
+				return
+			}
+			defer e.Close()
+
+			metadata, err := e.Information()
+			if err != nil {
+				log.Printf("error reading metadata %s: %v", path, err)
+				return
+			}
+
+			opf, err := e.Package()
+			if err != nil {
+				log.Printf("error reading package %s: %v", path, err)
 				return
 			}
 
@@ -72,6 +122,9 @@ func scan(dir string) (*Catalog, error) {
 				ModTime: info.ModTime(),
 				Size:    info.Size(),
 			}
+
+			// Extract cover info
+			book.CoverPath, book.CoverType = findCover(opf)
 
 			if len(metadata.Title) > 0 {
 				book.Title = metadata.Title[0]

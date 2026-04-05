@@ -16,6 +16,7 @@ const (
 
 type Feed struct {
 	XMLName xml.Name `xml:"http://www.w3.org/2005/Atom feed"`
+	XMLNS   string   `xml:"xmlns:dc,attr"`
 	ID      string   `xml:"id"`
 	Title   string   `xml:"title"`
 	Updated string   `xml:"updated"`
@@ -25,7 +26,7 @@ type Feed struct {
 }
 
 type Entry struct {
-	XMLName     xml.Name `xml:"http://www.w3.org/2005/Atom entry"`
+	XMLName     xml.Name `xml:"entry"`
 	ID          string   `xml:"id"`
 	Title       string   `xml:"title"`
 	Updated     string   `xml:"updated"`
@@ -63,6 +64,7 @@ type Category struct {
 
 func generateFeed(baseURL, title string, books []Book, updated time.Time) *Feed {
 	feed := &Feed{
+		XMLNS:   "http://purl.org/dc/terms/",
 		ID:      baseURL + "/",
 		Title:   title,
 		Updated: updated.UTC().Format(time.RFC3339),
@@ -125,6 +127,23 @@ func generateEntry(baseURL string, book Book) Entry {
 		Type:   "application/epub+zip",
 		Length: book.Size,
 	})
+
+	// Add cover image links if available
+	if book.CoverPath != "" {
+		coverURL := baseURL + "/covers/" + encodedPath + "?path=" + url.QueryEscape(book.CoverPath)
+		entry.Links = append(entry.Links,
+			Link{
+				Rel:  "http://opds-spec.org/image",
+				Href: coverURL,
+				Type: book.CoverType,
+			},
+			Link{
+				Rel:  "http://opds-spec.org/image/thumbnail",
+				Href: coverURL,
+				Type: book.CoverType,
+			},
+		)
+	}
 
 	return entry
 }

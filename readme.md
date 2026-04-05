@@ -15,4 +15,5 @@ opens a catalog at `http://localhost:8080/catalog`
 - serves a single acquisition feed as the catalog root
 - includes atom + dublin core metadata from epub files
 - provides download links with proper content types
+- cover image support: `http://opds-spec.org/image` and `http://opds-spec.org/image/thumbnail` links
 - supports parallel scanning for fast startup
