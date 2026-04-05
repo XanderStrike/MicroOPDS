@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -21,7 +22,7 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 
 		baseURL := getBaseURL(r)
 		feed := generateFeed(baseURL, "MiniOPDS Catalog", catalog.Books, time.Now())
-		
+
 		data, err := feed.XML()
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -30,10 +31,28 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 		w.Write(data)
 	})
 
-	// Root redirects to catalog
+	// Root shows info page
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			http.Redirect(w, r, "/catalog", http.StatusFound)
+			// count unique authors
+			authors := make(map[string]bool)
+			for _, b := range catalog.Books {
+				for _, a := range b.Authors {
+					authors[a] = true
+				}
+			}
+
+			baseURL := getBaseURL(r)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head><title>MiniOPDS</title></head>
+<body>
+<h1>MiniOPDS</h1>
+<p>%d authors, %d books in the catalog</p>
+<p>add this to your OPDS client: <a href="%s/catalog">%s/catalog</a></p>
+</body>
+</html>`, len(authors), len(catalog.Books), baseURL, baseURL)
 			return
 		}
 		http.NotFound(w, r)
