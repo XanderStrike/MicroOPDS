@@ -75,6 +75,7 @@ func generateFeed(baseURL, title string, books []Book, updated time.Time) *Feed 
 		Links: []Link{
 			{Rel: "self", Href: baseURL + "/catalog", Type: "application/atom+xml;profile=opds-catalog;kind=acquisition"},
 			{Rel: "start", Href: baseURL + "/catalog", Type: "application/atom+xml;profile=opds-catalog;kind=acquisition"},
+			{Rel: "search", Href: baseURL + "/search.xml", Type: "application/opensearchdescription+xml"},
 		},
 	}
 

@@ -31,6 +31,65 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 		w.Write(data)
 	})
 
+	// OpenSearch description document
+	mux.HandleFunc("/search.xml", func(w http.ResponseWriter, r *http.Request) {
+		baseURL := getBaseURL(r)
+		w.Header().Set("Content-Type", "application/opensearchdescription+xml; charset=utf-8")
+		fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>MicroOPDS</ShortName>
+  <Description>Search MicroOPDS catalog</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <OutputEncoding>UTF-8</OutputEncoding>
+  <Url type="application/atom+xml;profile=opds-catalog;kind=acquisition" template="%s/search?q={searchTerms}"/>
+</OpenSearchDescription>`, baseURL)
+	})
+
+	// Search endpoint
+	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("q")
+		if query == "" {
+			http.Error(w, "missing query parameter 'q'", http.StatusBadRequest)
+			return
+		}
+
+		// Simple case-insensitive string matching on title, author, and description
+		query = strings.ToLower(query)
+		var results []Book
+		for _, book := range catalog.Books {
+			matched := false
+			if strings.Contains(strings.ToLower(book.Title), query) {
+				matched = true
+			} else {
+				for _, author := range book.Authors {
+					if strings.Contains(strings.ToLower(author), query) {
+						matched = true
+						break
+					}
+				}
+			}
+			if !matched && strings.Contains(strings.ToLower(book.Description), query) {
+				matched = true
+			}
+			if matched {
+				results = append(results, book)
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/atom+xml;profile=opds-catalog;kind=acquisition; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=300")
+
+		baseURL := getBaseURL(r)
+		feed := generateFeed(baseURL, "Search: "+r.URL.Query().Get("q"), results, time.Now())
+
+		data, err := feed.XML()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.Write(data)
+	})
+
 	// Root shows info page
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
