@@ -59,10 +59,25 @@ func findCover(opf *epub.PackageDocument) (path string, mediaType string) {
 	}
 
 	if coverID != "" {
+		// Try exact match first
 		for _, item := range opf.Manifest.Items {
 			if item.ID == coverID {
 				return item.Href, item.MediaType
 			}
+		}
+		// Fallback: some EPUBs have malformed metadata where coverID="cover" but id="cover.jpg"
+		for _, item := range opf.Manifest.Items {
+			if strings.HasPrefix(item.ID, coverID) || strings.HasSuffix(item.ID, coverID) {
+				return item.Href, item.MediaType
+			}
+		}
+	}
+
+	// Last resort: look for common cover image names in manifest
+	for _, item := range opf.Manifest.Items {
+		lowerHref := strings.ToLower(item.Href)
+		if strings.Contains(lowerHref, "cover") && strings.HasPrefix(item.MediaType, "image/") {
+			return item.Href, item.MediaType
 		}
 	}
 
