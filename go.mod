@@ -1,4 +1,4 @@
-module miniopds
+module microopds
 
 go 1.23.4
 

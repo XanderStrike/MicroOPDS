@@ -3,9 +3,9 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o miniopds .
+RUN CGO_ENABLED=0 go build -o microopds .
 
 FROM alpine:3.19
-COPY --from=builder /app/miniopds /usr/local/bin/miniopds
+COPY --from=builder /app/microopds /usr/local/bin/microopds
 EXPOSE 8080
-CMD ["miniopds", "-dir", "/books", "-port", "8080"]
+CMD ["microopds", "-dir", "/books", "-port", "8080"]

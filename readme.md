@@ -1,4 +1,4 @@
-# miniopds
+# microopds
 
 a minimal opds 1.2 catalog server for epub files.
 
@@ -13,9 +13,10 @@ for when [tinyopds](https://github.com/sensboston/tinyopds) is just too much
 
 ## unfeatures
 
-miniOPDS does not and never will implement
+MicroOPDS does not and never will implement
 
 - a web interface
+- a reading interface
 - external metadata
 - formats other than epub
 - upload

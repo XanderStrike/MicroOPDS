@@ -69,7 +69,7 @@ func generateFeed(baseURL, title string, books []Book, updated time.Time) *Feed 
 		Title:   title,
 		Updated: updated.UTC().Format(time.RFC3339),
 		Author: &Author{
-			Name: "MiniOPDS",
+			Name: "MicroOPDS",
 			URI:  baseURL,
 		},
 		Links: []Link{

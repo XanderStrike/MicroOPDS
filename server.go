@@ -21,7 +21,7 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 		w.Header().Set("Cache-Control", "public, max-age=300")
 
 		baseURL := getBaseURL(r)
-		feed := generateFeed(baseURL, "MiniOPDS Catalog", catalog.Books, time.Now())
+		feed := generateFeed(baseURL, "MicroOPDS Catalog", catalog.Books, time.Now())
 
 		data, err := feed.XML()
 		if err != nil {
@@ -46,9 +46,9 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
-<head><title>MiniOPDS</title></head>
+<head><title>MicroOPDS</title></head>
 <body>
-<h1>MiniOPDS</h1>
+<h1>MicroOPDS</h1>
 <p>%d authors, %d books in the catalog</p>
 <p>add this to your OPDS client: <a href="%s/catalog">%s/catalog</a></p>
 </body>
@@ -171,7 +171,7 @@ func basicAuth(next http.Handler, user, pass string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, p, ok := r.BasicAuth()
 		if !ok || u != user || p != pass {
-			w.Header().Set("WWW-Authenticate", `Basic realm="MiniOPDS"`)
+			w.Header().Set("WWW-Authenticate", `Basic realm="MicroOPDS"`)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
