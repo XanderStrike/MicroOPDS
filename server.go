@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -214,6 +215,7 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 	if user != "" && pass != "" {
 		handler = basicAuth(mux, user, pass)
 	}
+	handler = loggingMiddleware(handler)
 
 	srv := &http.Server{
 		Addr:         addr,
@@ -224,6 +226,38 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 	}
 
 	return srv.ListenAndServe()
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		lw := &loggingWriter{w: w}
+		next.ServeHTTP(lw, r)
+		if !strings.HasPrefix(r.URL.Path, "/covers") {
+			uri := r.URL.Path
+			if r.URL.RawQuery != "" {
+				uri += "?" + r.URL.RawQuery
+			}
+			log.Printf("%s %s %d %v", r.Method, uri, lw.status, time.Since(start))
+		}
+	})
+}
+
+type loggingWriter struct {
+	w      http.ResponseWriter
+	status int
+}
+
+func (lw *loggingWriter) Header() http.Header         { return lw.w.Header() }
+func (lw *loggingWriter) Write(b []byte) (int, error) {
+	if lw.status == 0 {
+		lw.status = 200
+	}
+	return lw.w.Write(b)
+}
+func (lw *loggingWriter) WriteHeader(status int) {
+	lw.status = status
+	lw.w.WriteHeader(status)
 }
 
 func basicAuth(next http.Handler, user, pass string) http.Handler {
