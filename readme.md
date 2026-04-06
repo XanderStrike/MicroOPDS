@@ -20,7 +20,8 @@ MicroOPDS does not and never will implement
 - a reading interface
 - external metadata
 - formats other than epub
-- upload
+- metadata editing
+- support for large libraries (>5k books)
 - integration with calibre or anything else
 - any other features you can think of
 
