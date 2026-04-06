@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/pirmd/epub"
 )
 
 type Book struct {
 	RelPath     string // relative to base dir
-	AbsPath     string // absolute path for file access
 	Title       string
 	Authors     []string
 	Identifier  string
@@ -33,7 +33,33 @@ type Book struct {
 
 type Catalog struct {
 	Books []Book
-	mu    sync.RWMutex
+}
+
+type SafeCatalog struct {
+	mu   sync.RWMutex
+	cat  *Catalog
+	dir  string
+}
+
+func newSafeCatalog(dir string) *SafeCatalog {
+	return &SafeCatalog{cat: &Catalog{}, dir: dir}
+}
+
+func (sc *SafeCatalog) Get() *Catalog {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	return sc.cat
+}
+
+func (sc *SafeCatalog) Rescan() error {
+	cat, err := scan(sc.dir)
+	if err != nil {
+		return err
+	}
+	sc.mu.Lock()
+	sc.cat = cat
+	sc.mu.Unlock()
+	return nil
 }
 
 // findCover locates the cover image in an EPUB package
@@ -132,7 +158,6 @@ func scan(dir string) (*Catalog, error) {
 			}
 
 			book := Book{
-				AbsPath: path,
 				RelPath: relPath,
 				ModTime: info.ModTime(),
 				Size:    info.Size(),
@@ -184,6 +209,73 @@ func scan(dir string) (*Catalog, error) {
 	return &Catalog{Books: books}, err
 }
 
+func watchAndRescan(catalog *SafeCatalog, dir string) {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Printf("failed to create watcher: %v", err)
+		return
+	}
+	defer w.Close()
+
+	// add directory and all subdirectories for recursive watching
+	addDir := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return w.Add(path)
+		}
+		return nil
+	}
+	if err := filepath.Walk(dir, addDir); err != nil {
+		log.Printf("failed to watch directory: %v", err)
+		return
+	}
+
+	log.Printf("watching %s for changes", dir)
+
+	// debounce rescans to avoid thrashing on multiple events
+	var timer *time.Timer
+	debounce := 2 * time.Second
+
+	for {
+		select {
+		case event, ok := <-w.Events:
+			if !ok {
+				return
+			}
+			// only care about epub files
+			if filepath.Ext(event.Name) != ".epub" {
+				// but also watch new directories
+				if event.Has(fsnotify.Create) {
+					if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+						w.Add(event.Name)
+					}
+				}
+				continue
+			}
+			// create, write, remove, rename all trigger rescan
+			if timer != nil {
+				timer.Stop()
+			}
+			timer = time.AfterFunc(debounce, func() {
+				log.Printf("rescanning due to %s", event.Op.String())
+				start := time.Now()
+				if err := catalog.Rescan(); err != nil {
+					log.Printf("rescan failed: %v", err)
+				} else {
+					log.Printf("rescan complete: %d books in %v", len(catalog.Get().Books), time.Since(start))
+				}
+			})
+		case err, ok := <-w.Errors:
+			if !ok {
+				return
+			}
+			log.Printf("watcher error: %v", err)
+		}
+	}
+}
+
 func main() {
 	dir := flag.String("dir", ".", "directory containing epub files")
 	port := flag.Int("port", 8080, "port to listen on")
@@ -197,13 +289,17 @@ func main() {
 		log.Fatalf("invalid directory: %v", err)
 	}
 
+	catalog := newSafeCatalog(absDir)
+
 	log.Printf("scanning %s...", absDir)
 	start := time.Now()
-	catalog, err := scan(absDir)
-	if err != nil {
+	if err := catalog.Rescan(); err != nil {
 		log.Fatalf("scan failed: %v", err)
 	}
-	log.Printf("found %d books in %v", len(catalog.Books), time.Since(start))
+	log.Printf("found %d books in %v", len(catalog.Get().Books), time.Since(start))
+
+	// start filesystem watcher
+	go watchAndRescan(catalog, absDir)
 
 	addr := fmt.Sprintf(":%d", *port)
 	log.Printf("serving OPDS catalog at http://localhost%s/", addr)

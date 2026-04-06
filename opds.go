@@ -7,13 +7,6 @@ import (
 	"time"
 )
 
-const (
-	nsAtom  = "http://www.w3.org/2005/Atom"
-	nsDC    = "http://purl.org/dc/terms/"
-	nsOPDS  = "http://opds-spec.org/2010/catalog"
-	nsThr   = "http://purl.org/syndication/thread/1.0"
-)
-
 type Feed struct {
 	XMLName xml.Name `xml:"http://www.w3.org/2005/Atom feed"`
 	XMLNS   string   `xml:"xmlns:dc,attr"`

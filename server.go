@@ -9,11 +9,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
 
-func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
+func serve(addr, baseDir string, catalog *SafeCatalog, user, pass string) error {
 	mux := http.NewServeMux()
 
 	// OPDS catalog endpoint
@@ -21,8 +22,9 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 		w.Header().Set("Content-Type", "application/atom+xml;profile=opds-catalog;kind=acquisition; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=300")
 
+		cat := catalog.Get()
 		baseURL := getBaseURL(r)
-		feed := generateFeed(baseURL, "MicroOPDS Catalog", catalog.Books, time.Now())
+		feed := generateFeed(baseURL, "MicroOPDS Catalog", cat.Books, time.Now())
 
 		data, err := feed.XML()
 		if err != nil {
@@ -54,10 +56,11 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 			return
 		}
 
+		cat := catalog.Get()
 		// Simple case-insensitive string matching on title, author, and description
 		query = strings.ToLower(query)
 		var results []Book
-		for _, book := range catalog.Books {
+		for _, book := range cat.Books {
 			matched := false
 			if strings.Contains(strings.ToLower(book.Title), query) {
 				matched = true
@@ -94,9 +97,10 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 	// Root shows info page
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
+			cat := catalog.Get()
 			// count unique authors
 			authors := make(map[string]bool)
-			for _, b := range catalog.Books {
+			for _, b := range cat.Books {
 				for _, a := range b.Authors {
 					authors[a] = true
 				}
@@ -112,7 +116,7 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 <p>%d authors, %d books in the catalog</p>
 <p>add this to your OPDS client: <a href="%s/catalog">%s/catalog</a></p>
 </body>
-</html>`, len(authors), len(catalog.Books), baseURL, baseURL)
+</html>`, len(authors), len(cat.Books), baseURL, baseURL)
 			return
 		}
 		http.NotFound(w, r)
@@ -148,7 +152,7 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 		// Set proper content type
 		mime.AddExtensionType(".epub", "application/epub+zip")
 		w.Header().Set("Content-Type", "application/epub+zip")
-		w.Header().Set("Content-Length", stringOrInt(stat.Size()))
+		w.Header().Set("Content-Length", strconv.FormatInt(stat.Size(), 10))
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+filepath.Base(bookPath)+"\"")
 
 		http.ServeContent(w, r, filepath.Base(bookPath), stat.ModTime(), f)
@@ -183,11 +187,7 @@ func serve(addr, baseDir string, catalog *Catalog, user, pass string) error {
 
 		// Find and serve the cover image
 		for _, f := range zr.File {
-			// Handle both absolute and relative paths within the epub
 			fp := f.Name
-			if strings.HasPrefix(fp, "OEBPS/") || strings.HasPrefix(fp, "OPS/") {
-				// Check against both full path and relative path
-			}
 			if fp == coverPath || strings.HasSuffix(fp, coverPath) {
 				rc, err := f.Open()
 				if err != nil {
@@ -280,19 +280,4 @@ func getBaseURL(r *http.Request) string {
 	return scheme + "://" + r.Host
 }
 
-func stringOrInt(i int64) string {
-	var buf [20]byte
-	n := len(buf)
-	for i > 0 {
-		n--
-		buf[n] = byte('0' + i%10)
-		i /= 10
-	}
-	return string(buf[n:])
-}
 
-// io.ReadSeeker adapter for http.ServeContent
-type readSeeker struct {
-	io.Reader
-	io.Seeker
-}
