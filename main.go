@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -206,6 +207,23 @@ func scan(dir string) (*Catalog, error) {
 	})
 
 	wg.Wait()
+
+	// sort by author (first author, or title if no author)
+	sort.Slice(books, func(i, j int) bool {
+		ai := ""
+		if len(books[i].Authors) > 0 {
+			ai = books[i].Authors[0]
+		}
+		aj := ""
+		if len(books[j].Authors) > 0 {
+			aj = books[j].Authors[0]
+		}
+		if ai == aj {
+			return books[i].Title < books[j].Title
+		}
+		return ai < aj
+	})
+
 	return &Catalog{Books: books}, err
 }
 
