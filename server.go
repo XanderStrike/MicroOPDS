@@ -215,6 +215,7 @@ func serve(addr, baseDir string, catalog *SafeCatalog, user, pass string) error 
 	if user != "" && pass != "" {
 		handler = basicAuth(mux, user, pass)
 	}
+	handler = corsMiddleware(handler)
 	handler = loggingMiddleware(handler)
 
 	srv := &http.Server{
@@ -266,6 +267,19 @@ func basicAuth(next http.Handler, user, pass string) http.Handler {
 		if !ok || u != user || p != pass {
 			w.Header().Set("WWW-Authenticate", `Basic realm="MicroOPDS"`)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 		next.ServeHTTP(w, r)
